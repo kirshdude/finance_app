@@ -6,56 +6,56 @@ import numpy as np
 
 import plotly.express as px
 from charts import general_monthly_expenses_chart, breakdown
-from data_config import get_data, alter_dates, insert_data, filter_dates, get_categories, recurring_expenses, \
-     insert_recurring_expenses
+from data_config import DataConfig, csv_uploader, process_credit_card_sheet
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
-from design import main_dashboard_title, general_expenses_graph_title, side_bar_exp, space_markdown,\
+from design.headers import main_dashboard_title, general_expenses_graph_title, side_bar_exp, space_markdown,\
                     adding_recurring_expense, inserting_recurring_expenses
 
+from design.structure import side_bar, TABS
 
+
+data_class = DataConfig()
 
 
 def main():
 
-    st.set_page_config(layout='wide', page_icon='$',
-                   page_title='G&EFinanace')
+    st.set_page_config(layout='wide', page_icon='$', page_title='G&EFinanace')
 
     with st.sidebar:
-        selected = option_menu(menu_title='G&E Finances',
-                               options=['Expenses Dashboard','Insert Expenses', 'Balance sheet' , 'Pensions & Insurances'],
-                               icons=['house', 'database', 'database', 'file-earmark-person']
+        selected = option_menu(menu_title=side_bar['menu_title'],
+                               options=side_bar['options'],
+                               icons=side_bar['icons']
                                )
 
     # Option to select different view of the app
 
     if selected == 'Expenses Dashboard':
+
         st.write(main_dashboard_title, unsafe_allow_html=True, color="blue")
-        monthly_expenses = 'הוצאות שוטפות'
         st.write(general_expenses_graph_title, unsafe_allow_html=True)
 
         st.write(side_bar_exp, unsafe_allow_html=True )
         months = st.slider('', min_value=1, max_value=24, value=12, step=1)
 
-        sheet_name = monthly_expenses
-        data = get_data(sheet_name)
-        data = alter_dates(data)
-        filtered_data = filter_dates(data, months)
+        monthly_expenses = data_class.monthly_expenses
+        filtered_data = data_class.filter_dates(monthly_expenses, months)
+        # filtered_data = data_class.alter_dates(filtered_data)
 
         general_monthly_expenses_chart(filtered_data)
         # st.pyplot(general_monthly_expenses_chart(data))
 
         ############################################################
-        breakdown(data)
+        breakdown(monthly_expenses)
         print('got here')
 
     if selected == 'Insert Expenses':
-        TABS = ["🗃הכנסת נתונים", "📈 הוצאות קבועות ", "🔤 משהו מגניב"]
-        values= {'Month': datetime.now(), 'Main Category': '', 'Sub Category': '', 'Description': '', 'Amount': 0 ,'avoidable': ''}
+        tabs = TABS
+        values = {'Month': datetime.now(), 'Main Category': '', 'Sub Category': '', 'Description': '', 'Amount': 0 ,'avoidable': ''}
 
         #get the category names
-        categories = get_categories('הגדרת שמות')
+        categories = data_class.categories_dict
         # Month input Box
         current_date = datetime.now()
         last_six_months = [(current_date - relativedelta(months=i)).strftime('%b , %Y') for i in range(6)][::-1]
@@ -108,18 +108,26 @@ def main():
                 values['Amount'] = Amount
                 values['avoidable'] = avoidable
                 st.write("Saved:", Month)
-                insert_data('הוצאות שוטפות', [Main_Category, Sub_Category, Amount, Month, avoidable])
+                data_class.insert_data(data_class.monthly_expenses_sheet, [Main_Category, Sub_Category, Amount, Month, avoidable])
 
             one_month_ago = current_date - timedelta(days=30)
             one_month_ago = one_month_ago
 
         with tab2:
+            # Show the recurring expenses table
+            recurring_expenses = data_class.recurring_expenses
 
-            st.dataframe(recurring_expenses)
-            month_for_recurrent = st.selectbox(
-                "חודש", [str(date) for date in all_months[1:]], 3)
+            col1, col2, col3, col4 = st.columns(4)
+            with col4:
+                month_for_recurrent = st.selectbox("חודש", [str(date) for date in all_months[1:]], 3)
+
+            recurring_expenses['חודש'] = np.array([month_for_recurrent for i in range(recurring_expenses.shape[0])])
+
+            col1, col2 = st.columns(2)
+            with col2:
+                st.dataframe(recurring_expenses)
+
             add_button = st.button('הכנסת הוצאות קבועות', use_container_width=True)
-
 
             if add_button:
                 if 'progress_value' not in st.session_state:
@@ -127,9 +135,11 @@ def main():
                     st.session_state.progress_value = 0
 
                 # Create the progress bar
+                #Todo: make this a proper progressbar
                 progress_bar = st.progress(st.session_state.progress_value)
                 # Save or perform any action with the user's input
-                insert_recurring_expenses(recurring_expenses, 'הוצאות שוטפות', month_for_recurrent)
+
+                data_class.insert_recurring_expenses(recurring_expenses)
                 st.markdown("מושלם")
                 # recurring_expenses = recurring_expenses.append(new_row_data, ignore_index=True)
 
@@ -156,6 +166,13 @@ def main():
                 'סכום': Amount,
                 'ניתן לוותר':avoidable
             }
+
+        with tab3:
+            file = csv_uploader()
+            if file is not None:
+                df = process_credit_card_sheet(file)
+                st.dataframe(df)
+
 
 
     # if selected == 'Balance sheet':

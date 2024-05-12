@@ -8,8 +8,6 @@ import plotly.express as px
 import numpy as np
 
 
-
-
 def general_monthly_expenses_chart(data):
     # Group by month and calculate total amount
     monthly_total = data.groupby("Month")["Amount"].sum()
