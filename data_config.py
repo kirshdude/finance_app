@@ -1,47 +1,73 @@
-import gspread
-import pandas as pd
-from credentials import spreadsheet
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
 import streamlit as st
+import pandas as pd
+from datetime import datetime
 import time
+from dateutil.relativedelta import relativedelta
+
+from connectors.connection_manager import ConnectionManager
+connection_manager = ConnectionManager()
+bq_connection = connection_manager.bigquery_connection
+bq_client = bq_connection.client
+
 
 class DataConfig:
     def __init__(self):
-        self.categories_sheet = 'הגדרת שמות'
-        self.monthly_expenses_sheet = 'הוצאות שוטפות'
-        self.recurring_expenses_sheet = 'הוצאות קבועות'
+        # self.categories_sheet = 'הגדרת שמות'
+        # self.monthly_expenses_sheet = 'הוצאות שוטפות'
+        # self.recurring_expenses_sheet = 'הוצאות קבועות'
+        
+        self.project_id = 'personal-finance-401213'
+        self.dataset_id = 'expenses_test'
 
+        self.categories_table = 'expenses_categories'
+        self.monthly_expenses_table = 'monthly_expenses_final'
+        self.recurring_expenses_sheet = 'recurring_expenses'
+
+        self.monthly_expenses = self.get_monthly_expenses()
         self.categories_dict = self.get_categories()
         self.recurring_expenses = self.get_recurring_expenses()
-        self.monthly_expenses = self.get_monthly_expenses()
 
-    @staticmethod
-    def get_data(sheet_name):
+    def get_data(self, table_name):
         # Read data from the worksheet
-        worksheet = spreadsheet.worksheet(sheet_name)
-        data = pd.DataFrame(worksheet.get_all_records())
-        return data
+        table_ref = bq_client.dataset(self.dataset_id).table(table_name)
+        table = bq_client.get_table(table_ref)
+        columns = [schema_field.name for schema_field in table.schema]
+
+        # Construct the dynamic SQL query
+        column_checks = " OR ".join([f"{col} IS NOT NULL" for col in columns])
+        query = f"""
+            SELECT *
+            FROM `{self.project_id}.{self.dataset_id}.{table_name}`
+            WHERE {column_checks}
+            """
+        # Run the query
+        query_job = bq_client.query(query)
+        df = query_job.to_dataframe()
+        return df
 
     def get_categories(self):
-        categories = self.get_data(self.categories_sheet)
+        categories = self.get_data(self.categories_table)
+        categories.columns = categories.iloc[0]
+        categories = categories.drop(0)
         categories_dict = categories.to_dict(orient='list')
         return categories_dict
 
     def get_recurring_expenses(self):
         recurring_expenses = self.get_data(self.recurring_expenses_sheet)
-        recurring_expenses['חודש'] = [datetime.now() for i in range(len(recurring_expenses['קטגוריה']))]
-        recurring_expenses = self.alter_dates(recurring_expenses, 'חודש')
+        recurring_expenses['Month'] = [datetime.now() for i in range(len(recurring_expenses))]
+        recurring_expenses = self.alter_dates(recurring_expenses, 'Month')
         return recurring_expenses
 
     def get_monthly_expenses(self):
         date_column = 'Month'
-        monthly_expenses = self.get_data(self.monthly_expenses_sheet)
-        monthly_expenses[date_column] = pd.to_datetime(monthly_expenses[date_column], format='%b , %Y')
+        monthly_expenses = self.get_data(self.monthly_expenses_table)
+        # monthly_expenses = self.alter_dates(monthly_expenses, date_column)
+        # monthly_expenses[date_column] = pd.to_datetime(monthly_expenses[date_column], format='%b , %Y')
         return monthly_expenses
 
     @staticmethod
     def alter_dates(data, date_column='Month'):
+        data[date_column] = pd.to_datetime(data[date_column])
         data[date_column] = data[date_column].dt.strftime('%B %y')
         return data
 

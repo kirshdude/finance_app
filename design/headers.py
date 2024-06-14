@@ -1,6 +1,6 @@
 
 main_dashboard_title = """
-    <h1 style="color: blue; font-size: 56px;text-align:center;">דשבורד הוצאות</h1>
+    <h1 style="color: white; font-size: 56px;text-align:center;">Expenses Dashboard</h1>
 """
 
 general_expenses_graph_title = """

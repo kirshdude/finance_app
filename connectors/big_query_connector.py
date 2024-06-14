@@ -11,7 +11,7 @@ class BigQueryConnector:
     A class for connecting to and interacting with Google BigQuery.
     """
 
-    def __init__(self, json_key: str = None, project_id: str = 'production-275007', local_env: bool = False) -> None:
+    def __init__(self, json_key: str = None, project_id: str = None) -> None:
         """
         Initializes the BigQueryConnector.
 
@@ -19,10 +19,7 @@ class BigQueryConnector:
             json_key (str): JSON key as a string containing credentials.
             local_env (bool): Flag indicating whether to use local environment variables for credentials.
         """
-        if local_env:
-            credentials = json.loads(os.environ['BIG_QUERY_JSON'])
-            self.credentials = service_account.Credentials.from_service_account_info(credentials)
-        elif json_key is not None:
+        if json_key is not None:
             credentials = json.loads(json_key, strict=False)
             self.credentials = service_account.Credentials.from_service_account_info(credentials)
         else:
