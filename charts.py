@@ -1,30 +1,33 @@
 # from credentials import data
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
-
 import pandas as pd
 import streamlit as st
 import plotly.express as px
 import numpy as np
-
+import plotly.express as px
 
 def general_monthly_expenses_chart(data):
-    # Group by month and calculate total amount
-    monthly_total = data.groupby("Month")["Amount"].sum()
+    # Ensure the 'Month' column is in datetime format
+    data['Month'] = pd.to_datetime(data['Month'])
 
-    # Convert the index to a list for plotting
-    months = data['Month'].unique()
+    # Group by month and calculate total amount, then reset the index
+    monthly_total = data.groupby("Month")["Amount"].sum().reset_index()
+
+    # Sort by 'Month' to ensure chronological order
+    monthly_total = monthly_total.sort_values('Month')
 
     # Create the Plotly line chart
-    line_chart = px.line(data, x=months, y=monthly_total.values, labels={'Month': 'חודש', 'Amount': 'סך הכל הוצאות'},
+    line_chart = px.line(monthly_total, x='Month', y='Amount',
+                         labels={'Month': 'חודש', 'Amount': 'סך הכל הוצאות'},
                          width=900, height=600)
 
     # Add annotations for monthly totals
-    for i in range(len(monthly_total.values)):
+    for i in range(len(monthly_total)):
         line_chart.add_annotation(
-            x=months[i],
-            y=monthly_total.values[i],
-            text=str(monthly_total.values[i]),
+            x=monthly_total['Month'].iloc[i],
+            y=monthly_total['Amount'].iloc[i],
+            text=str(monthly_total['Amount'].iloc[i]),
             showarrow=True,
             arrowhead=0,
             ax=0,
@@ -32,20 +35,20 @@ def general_monthly_expenses_chart(data):
         )
 
     # Calculate the average of all monthly totals
-    average_total = np.mean(monthly_total.values)
+    average_total = monthly_total['Amount'].mean()
 
     # Add a trend line representing the average
     line_chart.add_shape(type="line",
-                         x0=min(months),
+                         x0=monthly_total['Month'].min(),
                          y0=average_total,
-                         x1=max(months),
+                         x1=monthly_total['Month'].max(),
                          y1=average_total,
                          line=dict(color="red", width=2, dash="dash"),
                          name="Average Trend")
 
     # Add data label for the average
     line_chart.add_annotation(
-        x=max(months),
+        x=monthly_total['Month'].max(),
         y=average_total,
         text=f'Average: {average_total:.2f}',
         showarrow=True,
@@ -57,7 +60,7 @@ def general_monthly_expenses_chart(data):
 
     # Display Plotly chart
     st.plotly_chart(line_chart)
-
+    # return line_chart
 
 def breakdown(data):
 
@@ -72,17 +75,17 @@ def breakdown(data):
     st.sidebar.write("Select filters:")
 
     category_filter = st.sidebar.selectbox("Select Category:", ["All"] + data["Category"].unique().tolist())
-    sub_category_filter = st.sidebar.selectbox("Select Subcategory:", ["All"] + data["Sub Category"].unique().tolist())
-    avoidable_filter = st.sidebar.selectbox("Is Avoidable:", ["All"] + data["Is Avoidable"].unique().tolist())
+    sub_category_filter = st.sidebar.selectbox("Select Subcategory:", ["All"] + data["Sub_Category"].unique().tolist())
+    avoidable_filter = st.sidebar.selectbox("Is Avoidable:", ["All"] + data["Is_Avoidable"].unique().tolist())
 
     # Filter data based on user selection
     filtered_data = data.copy()
     if category_filter != "All":
         filtered_data = filtered_data[filtered_data["Category"] == category_filter]
     if sub_category_filter != "All":
-        filtered_data = filtered_data[filtered_data["Sub Category"] == sub_category_filter]
+        filtered_data = filtered_data[filtered_data["Sub_Category"] == sub_category_filter]
     if avoidable_filter != "All":
-        filtered_data = filtered_data[filtered_data["Is Avoidable"] == avoidable_filter]
+        filtered_data = filtered_data[filtered_data["Is_Avoidable"] == avoidable_filter]
 
     # Function to generate breakdown data based on user selection
     def generate_breakdown_data(main_breakdown_options, sub_breakdown_options):
