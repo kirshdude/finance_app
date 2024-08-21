@@ -2,8 +2,8 @@
 #
 
 side_bar = {'menu_title': 'G&E Finances',
-            'options': ['Expenses Dashboard','Insert Expenses', 'Balance sheet', 'Pensions & Insurances'],
-            'icons': ['house', 'database', 'database', 'file-earmark-person']
+            'options': ['Home','Expenses Dashboard','Insert Expenses', 'Balance sheet', 'Pensions & Insurances'],
+            'icons': ['house','bar-chart','database', 'database', 'file-earmark-person']
             }
 
 

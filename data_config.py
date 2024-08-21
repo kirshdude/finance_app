@@ -12,33 +12,28 @@ bq_client = bq_connection.client
 
 class DataConfig:
     def __init__(self):
-        # self.categories_sheet = 'הגדרת שמות'
-        # self.monthly_expenses_sheet = 'הוצאות שוטפות'
-        # self.recurring_expenses_sheet = 'הוצאות קבועות'
         
         self.project_id = 'personal-finance-401213'
-        self.dataset_id = 'expenses_test'
+        self.dataset_id = 'gili_eyal_expenses'
 
-        self.categories_table = 'expenses_categories'
         self.monthly_expenses_table = 'monthly_expenses_final'
         self.recurring_expenses_sheet = 'recurring_expenses'
 
         self.monthly_expenses = self.get_monthly_expenses()
         self.categories_dict = self.get_categories()
-        self.recurring_expenses = self.get_recurring_expenses()
+        # self.recurring_expenses = self.get_recurring_expenses()
 
     def get_data(self, table_name):
         # Read data from the worksheet
-        table_ref = bq_client.dataset(self.dataset_id).table(table_name)
-        table = bq_client.get_table(table_ref)
-        columns = [schema_field.name for schema_field in table.schema]
-
+        # table_ref = bq_client.dataset(self.dataset_id).table(table_name)
+        # table = bq_client.get_table(table_ref)
         # Construct the dynamic SQL query
-        column_checks = " OR ".join([f"{col} IS NOT NULL" for col in columns])
+        # columns = [schema_field.name for schema_field in table.schema]
+        # column_checks = " OR ".join([f"{col} IS NOT NULL" for col in columns])
+
         query = f"""
             SELECT *
             FROM `{self.project_id}.{self.dataset_id}.{table_name}`
-            WHERE {column_checks}
             """
         # Run the query
         query_job = bq_client.query(query)
@@ -46,42 +41,52 @@ class DataConfig:
         return df
 
     def get_categories(self):
-        categories = self.get_data(self.categories_table)
-        categories.columns = categories.iloc[0]
-        categories = categories.drop(0)
-        categories_dict = categories.to_dict(orient='list')
+        data = self.monthly_expenses
+        categories_dict = data.groupby('category')['sub_category'].apply(list).to_dict()
         return categories_dict
 
     def get_recurring_expenses(self):
         recurring_expenses = self.get_data(self.recurring_expenses_sheet)
-        recurring_expenses['Month'] = [datetime.now() for i in range(len(recurring_expenses))]
-        recurring_expenses = self.alter_dates(recurring_expenses, 'Month')
+        recurring_expenses['month'] = [datetime.now() for i in range(len(recurring_expenses))]
+        recurring_expenses = self.alter_dates(recurring_expenses, 'month')
         return recurring_expenses
 
     def get_monthly_expenses(self):
-        date_column = 'Month'
+        date_column = 'month'
         monthly_expenses = self.get_data(self.monthly_expenses_table)
+        if 'month' in monthly_expenses.columns:
+            monthly_expenses['month'] = pd.to_datetime(monthly_expenses['month'], format='%b , %Y')
         # monthly_expenses = self.alter_dates(monthly_expenses, date_column)
         # monthly_expenses[date_column] = pd.to_datetime(monthly_expenses[date_column], format='%b , %Y')
         return monthly_expenses
 
     @staticmethod
-    def alter_dates(data, date_column='Month'):
+    def alter_dates(data, date_column='month'):
         data[date_column] = pd.to_datetime(data[date_column])
         data[date_column] = data[date_column].dt.strftime('%B %y')
         return data
 
     @staticmethod
     def filter_dates(data, months):
-        end_date = data['Month'].max()
+        end_date = data['month'].max()
+        # end_date = datetime.strptime(end_date, "%b , %Y")
         start_date = end_date - relativedelta(months=months)
         # Filter the DataFrame based on the date range
-        filtered_df = data[(data['Month'] >= start_date) & (data['Month'] <= end_date)]
+        filtered_df = data[(data['month'] >= start_date) & (data['month'] <= end_date)]
         return filtered_df
 
-    def insert_data(self, spread_sheet, new_data):
-        worksheet = spreadsheet.worksheet(spread_sheet)
-        worksheet.append_row(new_data)  # Insert data starting at row 2
+    def insert_data(self, table_name, data_dict):
+        columns = ', '.join(data_dict.keys())
+        values = ', '.join(
+            f"'{value}'" if isinstance(value, str) else str(value) for value in data_dict.values()
+        )
+
+        # Constructing the insert query
+        insert_query = f"""
+            INSERT INTO {self.project_id}.{self.dataset_id}.{table_name} ({columns}) 
+            VALUES ({values})
+        """
+        bq_client.query(insert_query)
 
     def insert_recurring_expenses(self, recurrent_expenses):
         for index, row in recurrent_expenses.iterrows():

@@ -48,12 +48,15 @@ def main():
         print('got here')
 
     if selected == 'Insert Expenses':
-        values = {'Month': datetime.now(), 'Main Category': '', 'Sub Category': '', 'Description': '', 'Amount': 0 ,'avoidable': ''}
 
         #get the category names
         categories = data_class.categories_dict
         # Month input Box
         current_date = datetime.now()
+        formatted_date = current_date.strftime('%Y-%m-%d')
+        values = {'category': '', 'sub_category': '', 'amount': 0, 'month': '',
+                  'is_avoidable': True, 'date_updated': formatted_date}
+
         last_six_months = [(current_date - relativedelta(months=i)).strftime('%b , %Y') for i in range(6)][::-1]
         # Generate dates for the next 6 months
         next_six_months = [(current_date + relativedelta(months=i)).strftime('%b , %Y') for i in range(1, 7)]
@@ -83,7 +86,7 @@ def main():
                         "Sub Category", [cat for cat in relevant_sub_categories], 0)
 
                     avoidable = st.selectbox(
-                        "Avoidable", ["Yes", "No"], 0)
+                        "Avoidable", [True, False], 0)
 
                     Amount = st.text_input("Amount", "")
 
@@ -103,70 +106,70 @@ def main():
                     save_button = st.form_submit_button("Save")
                     if save_button:
                         # Save or perform any action with the user's input
-                        values['Month'] = Month
-                        values['Main Category'] = Main_Category
-                        values['Sub Category'] = Sub_Category
-                        values['Amount'] = Amount
-                        values['avoidable'] = avoidable
+                        values['month'] = Month
+                        values['category'] = Main_Category
+                        values['sub_category'] = Sub_Category
+                        values['amount'] = int(Amount)
+                        values['is_avoidable'] = avoidable
+                        values['date_updated'] = formatted_date
                         st.write("Saved:", Month)
-                        data_class.insert_data(data_class.monthly_expenses_sheet, [Main_Category, Sub_Category, Amount, Month, avoidable])
+                        data_class.insert_data(data_class.monthly_expenses_table, values)
 
                     one_month_ago = current_date - timedelta(days=30)
-                    one_month_ago = one_month_ago
 
-        with tab2:
-            # Show the recurring expenses table
-            recurring_expenses = data_class.recurring_expenses
-
-            col1, col2, col3, col4 = st.columns(4)
-            with col4:
-                month_for_recurrent = st.selectbox("Month", [str(date) for date in all_months[1:]], 3)
-
-            recurring_expenses['Month'] = np.array([month_for_recurrent for i in range(recurring_expenses.shape[0])])
-
-            col1, col2 = st.columns(2)
-            with col2:
-                st.dataframe(recurring_expenses)
-
-            add_button = st.button('Insert recurring expenses', use_container_width=True)
-
-            if add_button:
-                if 'progress_value' not in st.session_state:
-                    # Initialize progress value in session state
-                    st.session_state.progress_value = 0
-
-                # Create the progress bar
-                #Todo: make this a proper progressbar
-                progress_bar = st.progress(st.session_state.progress_value)
-                # Save or perform any action with the user's input
-
-                data_class.insert_recurring_expenses(recurring_expenses)
-                st.markdown("Done")
-                # recurring_expenses = recurring_expenses.append(new_row_data, ignore_index=True)
-
-            st.write(space_markdown, unsafe_allow_html=True)
-            st.write(space_markdown, unsafe_allow_html=True)
-            st.write(adding_recurring_expense, unsafe_allow_html=True)
-            st.write(space_markdown, unsafe_allow_html=True)
-
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                # Getting user input
-                Main_Category = st.selectbox("Category", [cat for cat in categories.keys()], 0)
-            with col2:
-                Sub_Category = st.selectbox("Sub Category", [cat for cat in relevant_sub_categories], 0)
-            with col3:
-                avoidable = st.selectbox("Avoidable", ['לא','כן'], 0)
-
-            with col4:
-                Amount = st.text_input("Amount:", "")
-
-            new_row_data = {
-                'Category': Main_Category,
-                'Sub Category': Sub_Category,
-                'Amount': Amount,
-                'Avoidable':avoidable
-            }
+        # with tab2:
+        #     # Show the recurring expenses table
+        #     recurring_expenses = data_class.recurring_expenses
+        #
+        #     col1, col2, col3, col4 = st.columns(4)
+        #     with col4:
+        #         month_for_recurrent = st.selectbox("Month", [str(date) for date in all_months[1:]], 3)
+        #
+        #     recurring_expenses['Month'] = np.array([month_for_recurrent for i in range(recurring_expenses.shape[0])])
+        #
+        #     col1, col2 = st.columns(2)
+        #     with col2:
+        #         st.dataframe(recurring_expenses)
+        #
+        #     add_button = st.button('Insert recurring expenses', use_container_width=True)
+        #
+        #     if add_button:
+        #         if 'progress_value' not in st.session_state:
+        #             # Initialize progress value in session state
+        #             st.session_state.progress_value = 0
+        #
+        #         # Create the progress bar
+        #         #Todo: make this a proper progressbar
+        #         progress_bar = st.progress(st.session_state.progress_value)
+        #         # Save or perform any action with the user's input
+        #
+        #         data_class.insert_recurring_expenses(recurring_expenses)
+        #         st.markdown("Done")
+        #         # recurring_expenses = recurring_expenses.append(new_row_data, ignore_index=True)
+        #
+        #     st.write(space_markdown, unsafe_allow_html=True)
+        #     st.write(space_markdown, unsafe_allow_html=True)
+        #     st.write(adding_recurring_expense, unsafe_allow_html=True)
+        #     st.write(space_markdown, unsafe_allow_html=True)
+        #
+        #     col1, col2, col3, col4 = st.columns(4)
+        #     with col1:
+        #         # Getting user input
+        #         Main_Category = st.selectbox("Category", [cat for cat in categories.keys()], 0)
+        #     with col2:
+        #         Sub_Category = st.selectbox("Sub Category", [cat for cat in relevant_sub_categories], 0)
+        #     with col3:
+        #         avoidable = st.selectbox("Avoidable", ['לא','כן'], 0)
+        #
+        #     with col4:
+        #         Amount = st.text_input("Amount:", "")
+        #
+        #     new_row_data = {
+        #         'Category': Main_Category,
+        #         'Sub Category': Sub_Category,
+        #         'Amount': Amount,
+        #         'Avoidable':avoidable
+        #     }
 
         with tab3:
             file = csv_uploader()
