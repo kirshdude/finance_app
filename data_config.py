@@ -9,6 +9,8 @@ connection_manager = ConnectionManager()
 bq_connection = connection_manager.bigquery_connection
 bq_client = bq_connection.client
 
+def update_session_state(key, value):
+    st.session_state[key] = value
 
 class DataConfig:
     def __init__(self):
@@ -17,20 +19,20 @@ class DataConfig:
         self.dataset_id = 'gili_eyal_expenses'
 
         self.monthly_expenses_table = 'monthly_expenses_final'
-        self.recurring_expenses_sheet = 'recurring_expenses'
+        self.recurring_expenses_table = 'recurring_monthly_expenses_final'
 
         self.monthly_expenses = self.get_monthly_expenses()
+        self.recurring_expenses = self.get_recurring_expenses()
+
         self.categories_dict = self.get_categories()
-        # self.recurring_expenses = self.get_recurring_expenses()
+        if 'monthly_last_row' not in st.session_state:
+            st.session_state.monthly_last_row = self.monthly_expenses['expense_id'].max()
+        if 'recurring_last_row' not in st.session_state:
+            st.session_state.recurring_last_row = self.recurring_expenses['expense_id'].max()
+        if 'added_rows' not in st.session_state:
+            st.session_state.added_rows = pd.DataFrame(columns=self.monthly_expenses.columns)
 
     def get_data(self, table_name):
-        # Read data from the worksheet
-        # table_ref = bq_client.dataset(self.dataset_id).table(table_name)
-        # table = bq_client.get_table(table_ref)
-        # Construct the dynamic SQL query
-        # columns = [schema_field.name for schema_field in table.schema]
-        # column_checks = " OR ".join([f"{col} IS NOT NULL" for col in columns])
-
         query = f"""
             SELECT *
             FROM `{self.project_id}.{self.dataset_id}.{table_name}`
@@ -42,11 +44,12 @@ class DataConfig:
 
     def get_categories(self):
         data = self.monthly_expenses
-        categories_dict = data.groupby('category')['sub_category'].apply(list).to_dict()
+        categories_dict = data.groupby('category')['sub_category'].apply(lambda x: list(set(x))).to_dict()
+
         return categories_dict
 
     def get_recurring_expenses(self):
-        recurring_expenses = self.get_data(self.recurring_expenses_sheet)
+        recurring_expenses = self.get_data(self.recurring_expenses_table)
         recurring_expenses['month'] = [datetime.now() for i in range(len(recurring_expenses))]
         recurring_expenses = self.alter_dates(recurring_expenses, 'month')
         return recurring_expenses
@@ -88,13 +91,69 @@ class DataConfig:
         """
         bq_client.query(insert_query)
 
+        # Convert the dictionary to a DataFrame
+        new_row_df = pd.DataFrame([data_dict])
+        # Concatenate the new row to the existing DataFrame
+        st.session_state.added_rows = pd.concat([st.session_state.added_rows, new_row_df], ignore_index=True)
+        self.update_last_row(table_name ,up=True)
+
+
     def insert_recurring_expenses(self, recurrent_expenses):
+        # Initialize the progress bar
+        progress_bar = st.progress(0)
+
+        columns = recurrent_expenses.columns
+        total_rows = len(recurrent_expenses)
         for index, row in recurrent_expenses.iterrows():
             # Simulate some task that takes time
             time.sleep(0.1)
+            data_dict = dict(zip(columns, row))
+            self.insert_data(self.monthly_expenses_table, data_dict)
+
             # Update the progress bar in session state
-            st.session_state.progress_value = 100/(index + 1)
-            self.insert_data(self.monthly_expenses_sheet, list(row))
+            progress = (index + 1) / total_rows
+            progress_bar.progress(progress)
+
+        #Optional: Display a message when done
+        st.success("All recurring expenses have been inserted.")
+
+    def update_last_row(self, table_name, up:bool):
+        if table_name == 'monthly_expenses_final':
+            if up:
+                st.session_state.monthly_last_row += 1
+            else:
+                st.session_state.monthly_last_row -= 1
+        else:
+            if up:
+                st.session_state.recurring_last_row += 1
+            else:
+                st.session_state.recurring_last_row -= 1
+
+    def delete_row(self, table_name, conditions, last:bool):
+        if last:
+            if table_name == 'monthly_expenses_final':
+                delete_query = f"""
+                                   DELETE FROM {self.project_id}.{self.dataset_id}.{table_name}
+                                   WHERE expense_id = {st.session_state.monthly_last_row};
+                                """
+                st.session_state.added_rows = st.session_state.added_rows.iloc[:-1]
+
+            else:
+                delete_query = f"""
+                                   DELETE FROM {self.project_id}.{self.dataset_id}.{table_name}
+                                   WHERE expense_id = {st.session_state.recurring_last_row};
+                                                """
+        else:
+            delete_query = f"""
+                            DELETE FROM {self.project_id}.{self.dataset_id}.{table_name}
+                            WHERE {conditions};
+                          """
+
+        bq_client.query(delete_query)
+        self.update_last_row(table_name, up=False)
+
+
+
 
 def format_func(value):
     return "{:,.0f}₪".format(value)

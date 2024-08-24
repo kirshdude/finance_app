@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import pandas as pd
 import streamlit as st
+from design.headers import break_down_charts, space_markdown, choose_graph_header
 import plotly.express as px
 import numpy as np
 import plotly.express as px
@@ -68,25 +69,32 @@ def general_monthly_expenses_chart(data):
     st.plotly_chart(line_chart)
     # return line_chart
 
-def breakdown(df):
-    st.title("Monthly Expenses Analysis")
 
-    # Dropdown to select the insight
+def update_session_state(key, value):
+    # if key not in st.session_state:
+    if st.session_state.get(key) != value:
+        st.session_state[key] = value
+
+def breakdown(df):
+    insight_list = ["Total Expenses Over Time by Category",
+                    "Percentage of Sub Category by Category",
+                    "Total Percentage of Each Category of Expenses",
+                    "Total Breakdown of Avoidable vs Not Avoidable",
+                    "Breakdown of Category Types and Sub Category Types for a Specific Month",
+                    "Total Expenses Over Time by Avoidability"
+                    ]
+
+    st.write(choose_graph_header, unsafe_allow_html=True)
+    st.write(space_markdown, unsafe_allow_html=True)
     insight = st.selectbox(
-        "Select Chart",
-        [  "Total Expenses Over Time by Category",
-            "Percentage of Sub Category by Category",
-            "Total Percentage of Each Category of Expenses",
-            "Total Breakdown of Avoidable vs Not Avoidable",
-            "Breakdown of Category Types and Sub Category Types for a Specific Month",
-            "Total Expenses Over Time by Avoidability"
-        ],
-        key='insight_selectbox'
-    )
+            "Choose a chart ",
+            insight_list,
+            key='insight_selectbox'
+        )
 
     # Function to format and sort months
     def format_months(df):
-        months = df['month'].unique()
+        months = df['month'].dropna().unique()
         months = pd.to_datetime(months, format='%Y-%m').strftime('%B %Y')
         months = sorted(months, key=lambda x: pd.to_datetime(x, format='%B %Y'))
         return months
@@ -115,7 +123,7 @@ def breakdown(df):
 
         fig = px.bar(df_category_sum, x='category', y='Percentage', color='sub_category',
                      labels={'Percentage': 'Percentage'},
-                     title="Percentage of Sub Category by Category",
+                     # title="Percentage of Sub Category by Category",
                      height=700, width=1000)
         return fig
 
@@ -126,7 +134,7 @@ def breakdown(df):
         df_category_sum['Percentage'] = 100 * df_category_sum['amount'] / df_category_sum['amount'].sum()
 
         fig = px.pie(df_category_sum, names='category', values='Percentage',
-                     title="Total Percentage of Each Category of Expenses",
+                     # title="Total Percentage of Each Category of Expenses",
                      height=700, width=1000)
         return fig
 
@@ -136,7 +144,7 @@ def breakdown(df):
         df_avoidable_sum = df.groupby('is_avoidable')['amount'].sum().reset_index()
 
         fig = px.pie(df_avoidable_sum, names='is_avoidable', values='amount',
-                     title="Total Breakdown of Avoidable vs Not Avoidable Expenses",
+                     # title="Total Breakdown of Avoidable vs Not Avoidable Expenses",
                      height=700, width=1000)
         return fig
 
@@ -152,17 +160,24 @@ def breakdown(df):
         return fig
 
     # Function to plot total expenses over time broken down by category
-    def plot_total_expenses_over_time_by_category(df, excluded_months=None):
+    def plot_total_expenses_over_time_by_category(df, selected_categories, excluded_months=None):
         df = filter_months(df, excluded_months)
+
+        # Filter the DataFrame by the selected categories
+        if selected_categories:
+            df = df[df['category'].isin(selected_categories)]
+
         df_monthly_category_sum = df.groupby(['month', 'category'])['amount'].sum().reset_index()
         df_monthly_category_sum['month'] = pd.to_datetime(df_monthly_category_sum['month'], format='%Y-%m')
-        df_monthly_category_sum = df_monthly_category_sum.pivot(index='month', columns='category', values='amount').fillna(0)
+        df_monthly_category_sum = df_monthly_category_sum.pivot(index='month', columns='category',
+                                                                values='amount').fillna(0)
         df_monthly_category_sum = df_monthly_category_sum.reset_index()
-        df_monthly_category_sum = pd.melt(df_monthly_category_sum, id_vars='month', var_name='category', value_name='amount')
+        df_monthly_category_sum = pd.melt(df_monthly_category_sum, id_vars='month', var_name='category',
+                                          value_name='amount')
 
         fig = px.bar(df_monthly_category_sum, x='month', y='amount', color='category',
                      labels={'amount': 'amount'},
-                     title="Total Expenses Over Time by Category",
+                     # title="Total Expenses Over Time by Category",
                      height=700, width=1000)
         return fig
 
@@ -177,7 +192,7 @@ def breakdown(df):
 
         fig = px.bar(df_monthly_avoidable_sum, x='month', y='amount', color='is_avoidable',
                      labels={'amount': 'amount'},
-                     title="Total Expenses Over Time by Avoidability",
+                     # title="Total Expenses Over Time by Avoidability",
                      height=700, width=1000)
         return fig
 
@@ -187,7 +202,6 @@ def breakdown(df):
         selected_month = pd.to_datetime(selected_month, format='%B %Y').strftime('%Y-%m')
 
     # Layout: Single column with graph and dropdown below
-    st.write("### Graph")
     if insight == "Percentage of Sub Category by Category":
         fig = plot_percentage_subcategory_by_category(df, excluded_months)
 
@@ -201,9 +215,12 @@ def breakdown(df):
         fig = plot_breakdown_for_specific_month(df, selected_month)
 
     elif insight == "Total Expenses Over Time by Category":
-        fig = plot_total_expenses_over_time_by_category(df, excluded_months)
+        categories = df['category'].unique()
+        selected_categories = st.multiselect('Select Categories', categories, default=categories)
+        fig = plot_total_expenses_over_time_by_category(df, selected_categories, excluded_months)
 
     elif insight == "Total Expenses Over Time by Avoidability":
         fig = plot_total_expenses_over_time_by_avoidability(df, excluded_months)
 
+    st.write(break_down_charts.format(insight), unsafe_allow_html=True)
     st.plotly_chart(fig)
