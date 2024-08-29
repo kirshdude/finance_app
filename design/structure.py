@@ -7,4 +7,6 @@ side_bar = {'menu_title': 'G&E Finances',
             }
 
 
-TABS = ["🗃 Insert Expenses", "📈 Recurring Expenses ", "🔤 Upload Expenses CVS"]
+INSERT_EXP_TABS = ["📥 Manual Insert", "⬆️ Upload from CVS", "♻️ Manage Entries"]
+
+MANUAL_INSERT_TABS = ["☕️ Dynamic expenses", "🔄 Recurring expenses"]

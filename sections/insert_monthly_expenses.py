@@ -31,7 +31,6 @@ def insert_monthly_expenses(categories_cached, all_months_cached, data_class, fo
                 'date_updated': formatted_date,
                 'expense_id': max(0,st.session_state.monthly_last_row) + 1
             }
-            st.write("Saved:", Month)
-            data_class.insert_data(data_class.monthly_expenses_table, values)
-
+            result = data_class.insert_data(data_class.monthly_expenses_table, values)
+            st.success(result)
             return values

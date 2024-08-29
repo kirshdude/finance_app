@@ -18,17 +18,21 @@ class DataConfig:
         self.project_id = 'personal-finance-401213'
         self.dataset_id = 'gili_eyal_expenses'
 
-        self.monthly_expenses_table = 'monthly_expenses_final'
-        self.recurring_expenses_table = 'recurring_monthly_expenses_final'
+        self.monthly_expenses_table_name = 'monthly_expenses_final'
+        self.recurring_expenses_table_name = 'recurring_monthly_expenses_final'
 
         self.monthly_expenses = self.get_monthly_expenses()
+        if 'monthly_expenses_table_name' not in st.session_state:
+            st.session_state.monthly_expenses_table_name = self.monthly_expenses
         self.recurring_expenses = self.get_recurring_expenses()
+        if 'recurring_expenses_table_name' not in st.session_state:
+            st.session_state.recurring_expenses_table_name = self.recurring_expenses
 
         self.categories_dict = self.get_categories()
         if 'monthly_last_row' not in st.session_state:
             st.session_state.monthly_last_row = self.monthly_expenses['expense_id'].max()
-        if 'recurring_last_row' not in st.session_state:
-            st.session_state.recurring_last_row = self.recurring_expenses['expense_id'].max()
+        # if 'recurring_last_row' not in st.session_state:
+        #     st.session_state.recurring_last_row = self.recurring_expenses['expense_id'].max()
         if 'added_rows' not in st.session_state:
             st.session_state.added_rows = pd.DataFrame(columns=self.monthly_expenses.columns)
 
@@ -49,14 +53,14 @@ class DataConfig:
         return categories_dict
 
     def get_recurring_expenses(self):
-        recurring_expenses = self.get_data(self.recurring_expenses_table)
+        recurring_expenses = self.get_data(self.recurring_expenses_table_name)
         recurring_expenses['month'] = [datetime.now() for i in range(len(recurring_expenses))]
         recurring_expenses = self.alter_dates(recurring_expenses, 'month')
         return recurring_expenses
 
     def get_monthly_expenses(self):
         date_column = 'month'
-        monthly_expenses = self.get_data(self.monthly_expenses_table)
+        monthly_expenses = self.get_data(self.monthly_expenses_table_name)
         if 'month' in monthly_expenses.columns:
             monthly_expenses['month'] = pd.to_datetime(monthly_expenses['month'], format='%b , %Y')
         # monthly_expenses = self.alter_dates(monthly_expenses, date_column)
@@ -89,13 +93,31 @@ class DataConfig:
             INSERT INTO {self.project_id}.{self.dataset_id}.{table_name} ({columns}) 
             VALUES ({values})
         """
-        bq_client.query(insert_query)
+        #TODO: add here an exception of error and update last row only if no error
+        query_job = bq_client.query(insert_query)
 
-        # Convert the dictionary to a DataFrame
-        new_row_df = pd.DataFrame([data_dict])
-        # Concatenate the new row to the existing DataFrame
-        st.session_state.added_rows = pd.concat([st.session_state.added_rows, new_row_df], ignore_index=True)
-        self.update_last_row(table_name ,up=True)
+        try:
+            results = query_job.result()
+            print(results)
+            error_message = None
+
+        except Exception as error:
+            error_message = str(error)
+            sorry = 'We are so sorry!'
+            user_error_message =  sorry + error_message
+            print(user_error_message)
+            return user_error_message
+
+        if error_message is None:
+            # Convert the dictionary to a DataFrame
+            new_row_df = pd.DataFrame([data_dict])
+            # Concatenate the new row to the existing DataFrame
+            st.session_state.added_rows = pd.concat([st.session_state.added_rows, new_row_df], ignore_index=True)
+            self.update_last_row(table_name, up=True)
+            self.update_table(table_name=table_name, add=True, row=new_row_df)
+            success_message = 'Data successfully inserted!'
+            print(success_message)
+            return success_message
 
 
     def insert_recurring_expenses(self, recurrent_expenses):
@@ -108,14 +130,18 @@ class DataConfig:
             # Simulate some task that takes time
             time.sleep(0.1)
             data_dict = dict(zip(columns, row))
-            self.insert_data(self.monthly_expenses_table, data_dict)
-
+            data_dict['expense_id'] = max(0,st.session_state.monthly_last_row) + 1
+            self.insert_data(self.monthly_expenses_table_name, data_dict)
             # Update the progress bar in session state
+            #Todo: add here an option that there was a failure
             progress = (index + 1) / total_rows
             progress_bar.progress(progress)
 
-        #Optional: Display a message when done
+
         st.success("All recurring expenses have been inserted.")
+        time.sleep(2)  # Display the message for 2 seconds
+        st.experimental_rerun()
+
 
     def update_last_row(self, table_name, up:bool):
         if table_name == 'monthly_expenses_final':
@@ -146,14 +172,28 @@ class DataConfig:
         else:
             delete_query = f"""
                             DELETE FROM {self.project_id}.{self.dataset_id}.{table_name}
-                            WHERE {conditions};
+                            WHERE expense_id = {conditions};
                           """
-
         bq_client.query(delete_query)
         self.update_last_row(table_name, up=False)
 
 
+    def update_table(self, table_name, add:bool, row=None, index=None):
+        if table_name == self.monthly_expenses_table_name:
+            if add:
+                st.session_state.monthly_expenses_table_name = pd.concat([st.session_state.monthly_expenses_table_name, row], ignore_index=True)
+            else:
+                st.session_state.monthly_expenses_table_name = st.session_state.monthly_expenses_table_name[st.session_state.monthly_expenses_table_name['expense_id'] != index]
+        else:
+            if add:
+                st.session_state.recurring_expenses_table_name = pd.concat([st.session_state.recurring_expenses_table_name, row], ignore_index=True)
+            else:
+                st.session_state.recurring_expenses_table_name = st.session_state.recurring_expenses_table_name.drop(index=index)
 
+
+    def show_df(self, table: pd.DataFrame, order_by: list, ascending: bool):
+        table = table.sort_values(by=order_by, ascending=ascending)
+        st.dataframe(table)
 
 def format_func(value):
     return "{:,.0f}₪".format(value)
@@ -186,5 +226,7 @@ def process_credit_card_sheet(csv_file):
 
     return df
 
-
+#Todo: add an index column to the recurring expenses table in order to delete and add rows
+# Add the option to add row to recurring expenses
+# add option to remove row from recurring expenses
 
