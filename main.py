@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Set the page configuration
-st.set_page_config(layout='wide', page_icon='$', page_title='G&EFinanace')
+st.set_page_config(layout='wide', page_icon='$', page_title='G&E Finance')
 
 from streamlit_option_menu import option_menu
 import numpy as np
@@ -9,10 +9,11 @@ from charts import general_monthly_expenses_chart, breakdown
 from data_config import DataConfig, csv_uploader, process_credit_card_sheet
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from design.headers import main_dashboard_title, general_expenses_graph_title, slide_bar_exp, space_markdown, \
+from design.headers import main_dashboard_title, general_expenses_graph_title, slide_bar_exp, \
     adding_recurring_expense, home_page_title
-from design.structure import side_bar, INSERT_EXP_TABS, MANUAL_INSERT_TABS
-import design.buttons as deisgn_buttons
+
+from design.structure import SIDE_BAR, INSERT_EXP_TABS, MANUAL_INSERT_TABS, create_blank_line
+import design.buttons as design_buttons
 from sections.insert_monthly_expenses import insert_monthly_expenses as insert_monthly_expenses_form
 
 # Initialize the data class
@@ -21,7 +22,7 @@ data_class = DataConfig()
 # Caching data processing functions
 @st.cache_data
 def load_monthly_expenses():
-    return data_class.monthly_expenses
+    return st.session_state.monthly_expenses_table
 
 @st.cache_data
 def filter_dates(data, months):
@@ -35,7 +36,7 @@ categories_cached = load_categories()
 
 @st.cache_data
 def load_recurring_expenses():
-    return data_class.recurring_expenses
+    return st.session_state.recurring_expenses_table
 
 current_date = datetime.now()
 @st.cache_data
@@ -64,9 +65,9 @@ def update_session_state(key, value):
 def main():
 
     with st.sidebar:
-        selected = option_menu(menu_title=side_bar['menu_title'],
-                               options=side_bar['options'],
-                               icons=side_bar['icons'])
+        selected = option_menu(menu_title=SIDE_BAR['menu_title'],
+                               options=SIDE_BAR['options'],
+                               icons=SIDE_BAR['icons'])
 
 
 
@@ -82,7 +83,7 @@ def main():
 
     if selected == 'Expenses Dashboard':
         st.write(main_dashboard_title, unsafe_allow_html=True, color="white")
-        st.write(space_markdown, unsafe_allow_html=True)
+        create_blank_line(1)
         st.write(general_expenses_graph_title, unsafe_allow_html=True)
 
         months = st.slider('Choose the # of months back', min_value=1, max_value=24, value=12, step=1)
@@ -90,7 +91,7 @@ def main():
         filtered_data = filter_dates(monthly_expenses, months)
 
         general_monthly_expenses_chart(filtered_data)
-        st.write(space_markdown, unsafe_allow_html=True)
+        create_blank_line(1)
         breakdown(monthly_expenses)
 
 ########################################################################################################################
@@ -104,31 +105,30 @@ def main():
 ###################################################  TAB 1  ############################################################
 
         with manual:
-            st.write(space_markdown, unsafe_allow_html=True)
+            create_blank_line(1)
 
             dynamic, recurring = st.tabs(MANUAL_INSERT_TABS)
 
             with dynamic:
                 st.markdown("<h1>Insert expenses</h1>", unsafe_allow_html=True)
-                st.write(space_markdown, unsafe_allow_html=True)
+                create_blank_line(1)
                 col1, col2 = st.columns([1, 2])
 
                 with col1:
                     added_rows = insert_monthly_expenses_form(categories_cached, all_months_cached, data_class, formatted_date)
 
-                    for i in range(4):
-                        st.write(space_markdown, unsafe_allow_html=True)
+                create_blank_line(3)
 
-                    if len(st.session_state.added_rows)>=1:
-                        st.markdown("<h1>Added expenses</h1>", unsafe_allow_html=True)
-                        st.dataframe(st.session_state.added_rows)
+                if len(st.session_state.added_rows)>=1:
+                    st.markdown("<h1>Added expenses</h1>", unsafe_allow_html=True)
+                    st.dataframe(st.session_state.added_rows)
 
-                        deisgn_buttons.delete_last_row()
-                        delete_last_button = st.button("Delete Last Row", key="delete_button", use_container_width=True)
-                        if delete_last_button:
-                            data_class.delete_row(table_name=data_class.monthly_expenses_table, conditions=None, last=True)
-                            st.experimental_rerun()
-                            st.write(f'deleted {st.session_state.recurring_last_row}', unsafe_allow_html=True)
+                    design_buttons.delete_last_row()
+                    delete_last_button = st.button("Delete Last Row", key="delete_button", use_container_width=True)
+                    if delete_last_button:
+                        data_class.delete_row(table_name=data_class.monthly_expenses_table_name, conditions=None, last=True)
+                        st.rerun()
+                        st.write(f'deleted {st.session_state.recurring_last_row}', unsafe_allow_html=True)
 
 
 
@@ -147,10 +147,9 @@ def main():
                 if add_button:
                     data_class.insert_recurring_expenses(recurring_expenses)
 
-                st.write(space_markdown, unsafe_allow_html=True)
-                st.write(space_markdown, unsafe_allow_html=True)
+                create_blank_line(2)
                 st.write(adding_recurring_expense, unsafe_allow_html=True)
-                st.write(space_markdown, unsafe_allow_html=True)
+                create_blank_line(1)
 
                 #TODO: add the ability to add recurring expenses
                 col1, col2, col3, col4 = st.columns(4)
@@ -177,17 +176,18 @@ def main():
                 st.dataframe(df)
 
         with manage:
-            data_class.show_df(table=st.session_state.monthly_expenses_table_name, order_by=['expense_id','date_updated','month'], ascending=False)
+            data_class.show_df(table=st.session_state.monthly_expenses_table, order_by=['expense_id','date_updated','month'], ascending=False)
 
             st.markdown("<h2>Choose expense to remove</h2>", unsafe_allow_html=True)
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             with col1:
-                expense_to_remove = st.text_input("Expense ID:")
-                remove_button = st.button("Remove Expense", use_container_width=True)
-                if remove_button:
-                    data_class.delete_row(table_name=data_class.monthly_expenses_table_name, conditions=int(expense_to_remove), last=False)
-                    data_class.update_table(data_class.monthly_expenses_table_name, add=False, index=int(expense_to_remove))
-                    st.experimental_rerun()
+                with st.form(key='remove_data'):
+                    expense_to_remove = st.text_input("Expense ID:")
+                    remove_button = st.form_submit_button("Remove Expense", use_container_width=True)
+                    if remove_button:
+                        data_class.delete_row(table_name=data_class.monthly_expenses_table_name, conditions=int(expense_to_remove), last=False)
+                        data_class.update_table(data_class.monthly_expenses_table_name, add=False, index=int(expense_to_remove))
+                        st.rerun()
 
 if __name__ == '__main__':
     main()
