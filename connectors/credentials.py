@@ -1,5 +1,3 @@
-import os
-
 SERVICE_ACCOUNT_JSON = '''{
   "type": "service_account",
   "project_id": "personal-finance-401213",
