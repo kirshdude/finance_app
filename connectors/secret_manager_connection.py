@@ -1,6 +1,4 @@
 import json
-import os
-
 from google.cloud import secretmanager
 from google.oauth2 import service_account
 

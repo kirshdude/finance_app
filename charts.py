@@ -1,15 +1,7 @@
-# from credentials import data
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
 import pandas as pd
 import streamlit as st
 from design.headers import break_down_charts, space_markdown, choose_graph_header
 import plotly.express as px
-import numpy as np
-import plotly.express as px
-import altair as alt
-import seaborn as sns
-
 
 
 def general_monthly_expenses_chart(data):
