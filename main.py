@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Set the page configuration
-st.set_page_config(layout='wide', page_icon='$', page_title='G&E Finance')
+st.set_page_config(layout='wide', page_icon='chart_with_upwards_trend', page_title='G&E Finance')
 
 from streamlit_option_menu import option_menu
 import numpy as np
@@ -70,6 +70,25 @@ def main():
                                icons=SIDE_BAR['icons'])
 
 
+    if selected == 'Home':
+        st.write(home_page_title, unsafe_allow_html=True, color="white")
+
+        st.markdown(
+            """
+            <style>
+                button[title^=Exit]+div [data-testid=stImage]{
+                    text-align: center;
+                    display: block;
+                    margin-left: auto;
+                    margin-right: auto;
+                    width: 50%;
+                }
+            </style>
+            """, unsafe_allow_html=True
+        )
+
+        st.image("Gili_money_vegas.jpeg")
+
 
 ########################################################################################################################
 ############################################  EXPENSES DASHBOARD  ######################################################
@@ -78,8 +97,7 @@ def main():
 # Make sure all the charts work
 # Add the chart for specific category over time
 # Add the % for the amounts in the charts
-    if selected == 'Home':
-        st.write(home_page_title, unsafe_allow_html=True, color="white")
+
 
     if selected == 'Expenses Dashboard':
         st.write(main_dashboard_title, unsafe_allow_html=True, color="white")

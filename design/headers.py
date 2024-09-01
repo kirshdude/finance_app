@@ -1,5 +1,5 @@
 home_page_title = """
-    <h1 style="color: white; font-size: 64px;text-align:center;">Welcome to G&E Finance app</h1>
+    <h1 style="color: white; font-size: 64px;text-align:center;">G&E Finances</h1>
 """
 
 
