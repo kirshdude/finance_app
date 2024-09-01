@@ -139,9 +139,8 @@ class DataConfig:
         time.sleep(2)  # Display the message for 2 seconds
         st.rerun()
 
-    @staticmethod
-    def update_last_row(table_name, up:bool):
-        if table_name == 'monthly_expenses_final':
+    def update_last_row(self, table_name, up:bool):
+        if table_name == self.monthly_expenses_table_name:
             if up:
                 st.session_state.monthly_last_row += 1
             else:
@@ -154,7 +153,7 @@ class DataConfig:
 
     def delete_row(self, table_name, conditions, last:bool):
         if last:
-            if table_name == 'monthly_expenses_final':
+            if table_name == self.monthly_expenses_table_name:
                 delete_query = f"""
                                    DELETE FROM {self.project_id}.{self.dataset_id}.{table_name}
                                    WHERE expense_id = {st.session_state.monthly_last_row};
